@@ -18,11 +18,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const syncToCloud = async () => {
         try {
+            // Inject dailyMessages into shifts for GAS compatibility since GAS might drop unknown keys
+            const exportedShifts = [
+                ...state.shifts,
+                ...(state.dailyMessages || []).map(m => ({ ...m, isDailyMessage: true }))
+            ];
             const dataToSync = {
                 leads: state.leads,
-                shifts: state.shifts,
-                submissions: state.submissions,
-                dailyMessages: state.dailyMessages
+                shifts: exportedShifts,
+                submissions: state.submissions
             };
             // Send to cloud bridge
             await fetch(SYNC_URL, {
@@ -39,10 +43,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(SYNC_URL);
             if (response.ok) {
                 const cloudData = await response.json();
-                if (cloudData.shifts) state.shifts = cloudData.shifts;
+                if (cloudData.shifts) {
+                    state.shifts = cloudData.shifts.filter(s => !s.isDailyMessage);
+                    state.dailyMessages = cloudData.shifts.filter(s => s.isDailyMessage);
+                }
                 if (cloudData.submissions) state.submissions = cloudData.submissions;
                 if (cloudData.leads) state.leads = cloudData.leads;
-                if (cloudData.dailyMessages) state.dailyMessages = cloudData.dailyMessages;
                 
                 localStorage.setItem('pw_data_shifts', JSON.stringify(state.shifts));
                 localStorage.setItem('pw_data_submissions', JSON.stringify(state.submissions));
@@ -465,7 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 img.onload = () => {
                     let width = img.width;
                     let height = img.height;
-                    // Resize logic
+                    // Resize logic - shrink heavily for cloud compatibility (limit payload size)
                     if (width > height) {
                         if (width > maxSize) {
                             height *= maxSize / width;
@@ -482,7 +488,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     canvas.height = height;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.8)); // Add compression
+                    // Lower quality significantly to keep strings under 50,000 chars for spreadsheet limits
+                    resolve(canvas.toDataURL('image/jpeg', 0.4));
                 };
                 img.src = e.target.result;
             };
@@ -510,7 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let photoData = null;
                 if (photoInput.files && photoInput.files[0]) {
                     const file = photoInput.files[0];
-                    photoData = await resizeImage(file, 800);
+                    photoData = await resizeImage(file, 400); // reduced size to fit in cloud cell limit
                 }
 
                 const d = new Date(rawDate);

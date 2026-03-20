@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PW参加申込書</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Noto+Sans+JP:wght@300;400;500;700&display=swap"
+        rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+</head>
+
+<body>
+    <style>
+        #admin-password-input {
+            text-align: center;
+            font-size: 1.5rem;
+            letter-spacing: 0.5rem;
+            padding: 1rem;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            width: 100%;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        #admin-password-input:focus {
+            border-color: var(--primary);
+        }
+    </style>
+
+    <!-- Password Modal -->
+    <div id="password-modal" class="modal hidden" style="z-index: 2000;">
+        <div class="modal-content" style="max-width: 320px; width: 90%;">
+            <div class="success-icon" style="background: rgba(99, 102, 241, 0.1); color: var(--primary);">
+                <i data-lucide="shield-check"></i>
+            </div>
+            <h3>管理者認証</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">4桁のパスワードを入力してください</p>
+            <input type="password" id="admin-password-input" maxlength="4" placeholder="****">
+            <div id="pw-error-msg" style="color: #ef4444; font-size: 0.75rem; margin-top: 0.5rem; min-height: 1.2rem;">
+            </div>
+            <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                <button id="pw-cancel-btn" class="primary-btn"
+                    style="background: #f3f4f6; color: #374151; border: 1px solid #d1d5db;">戻る</button>
+                <button id="pw-submit-btn" class="primary-btn">認証</button>
+            </div>
+            <button id="pw-forgot-btn" class="text-link-btn"
+                style="margin-top: 1rem; font-size: 0.7rem; color: var(--primary); text-decoration: underline;">パスワードを忘れた場合</button>
+        </div>
+    </div>
+    <div id="app" class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-top">
+                <h1 id="page-title">PW参加申込フォーム</h1>
+                <button id="main-admin-btn" class="icon-btn" title="管理者モード">
+                    <i data-lucide="lock"></i>
+                </button>
+            </div>
+            <nav id="user-nav" class="tab-scroller">
+                <div class="tabs">
+                    <button class="tab active" data-view="register-view">
+                        <i data-lucide="user-plus"></i> 登録
+                    </button>
+                    <button class="tab" data-view="status-view">
+                        <i data-lucide="clipboard-check"></i> あなたの申込状況
+                    </button>
+                </div>
+            </nav>
+        </header>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <!-- 1. 登録画面 -->
+            <section id="register-view" class="view active">
+                <div id="daily-messages-container">
+                    <!-- Dynamic -->
+                </div>
+                <p style="margin-bottom: 1.5rem; color: var(--text-muted); font-size: 0.85rem; font-weight: 500;">
+                    以下のフォームにご記入ください。</p>
+                <form id="main-form">
+                    <div class="input-group">
+                        <label>お名前 <span class="required">*</span></label>
+                        <div class="input-wrapper">
+                            <i data-lucide="user" class="input-icon"></i>
+                            <input type="text" name="user_name" placeholder="フルネームを入力" required>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>参加希望日（選択） <span class="required">*</span></label>
+                        <div class="shift-table-container">
+                            <table class="shift-table">
+                                <thead>
+                                    <tr>
+                                        <th>日程</th>
+                                        <th>責任者</th>
+                                        <th>選択</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="user-shift-tbody">
+                                    <!-- Dynamic -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+
+                    <div class="form-actions">
+                        <button type="submit" class="submit-btn">
+                            <i data-lucide="send"></i> <span>送信する</span>
+                        </button>
+                    </div>
+                </form>
+
+            </section>
+
+            <!-- 2. 申込状況画面 -->
+            <section id="status-view" class="view" style="display:none;">
+                <div id="personal-history-list">
+                    <!-- Dynamic -->
+                </div>
+            </section>
+
+            <!-- 3. 管理画面 -->
+            <section id="admin-view" class="view" style="display:none;">
+                <div class="view-header">
+                    <div>
+                        <h2 style="text-align: left; margin: 0;">ADMIN CONSOLE</h2>
+                        <p class="text-muted" style="text-align: left; margin: 0;">申込状況の管理と設定</p>
+                    </div>
+                    <button id="admin-back-btn" class="mini-primary-btn"
+                        style="background: var(--text-muted); white-space: nowrap;">
+                        <i data-lucide="arrow-left"></i> 戻る
+                    </button>
+                </div>
+
+                <!-- 1. 申込者リスト (TOP) -->
+                <div class="admin-main-card">
+                    <div class="card-header">
+                        <h3>申込者一覧</h3>
+                    </div>
+                    <div class="table-scroller">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th style="min-width: 120px;">日程</th>
+                                    <th>参加希望者</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adm-submission-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 2. 作成済みリスト -->
+                <div class="admin-main-card">
+                    <div class="card-header">
+                        <h3>現在の募集枠</h3>
+                    </div>
+                    <div class="table-scroller">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>日時</th>
+                                    <th>責任者</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adm-shift-list-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 3. シフト作成 & 責任者管理 -->
+                <div class="admin-main-card">
+                    <div class="card-header">
+                        <h3>シフトの新規作成</h3>
+                    </div>
+                    <form id="admin-add-shift-form" class="admin-inline-form">
+                        <div class="input-wrapper-mini">
+                            <input type="date" id="adm-date" required>
+                            <span class="date-label">日付</span>
+                        </div>
+                        <select id="adm-time" required>
+                            <option value="" disabled selected>時間</option>
+                            <option value="09:00-10:00">09:00-10:00</option>
+                            <option value="10:00-11:00">10:00-11:00</option>
+                            <option value="11:00-12:00">11:00-12:00</option>
+                            <option value="12:00-13:00">12:00-13:00</option>
+                            <option value="13:00-14:00">13:00-14:00</option>
+                            <option value="14:00-15:00">14:00-15:00</option>
+                            <option value="15:00-16:00">15:00-16:00</option>
+                            <option value="16:00-17:00">16:00-17:00</option>
+                            <option value="17:00-18:00">17:00-18:00</option>
+                            <option value="18:00-19:00">18:00-19:00</option>
+                            <option value="19:00-20:00">19:00-20:00</option>
+                            <option value="20:00-21:00">20:00-21:00</option>
+                        </select>
+                        <select id="adm-lead" required>
+                            <!-- Dynamic Leads -->
+                        </select>
+                        <button type="submit" class="mini-primary-btn"><i data-lucide="plus"></i> 追加</button>
+                    </form>
+
+                    <!-- 責任者追加 -->
+                    <div class="sub-card"
+                        style="margin-top:1rem; border-top:1px dashed var(--border); padding-top:1rem;">
+                        <h4 style="font-size:0.8rem; margin-bottom:0.5rem;">責任者の追加</h4>
+                        <div class="admin-inline-form">
+                            <input type="text" id="adm-new-lead" placeholder="名前を入力">
+                            <button type="button" id="adm-add-lead-btn" class="mini-primary-btn">登録</button>
+                        </div>
+                        <div id="adm-leads-tags" class="leads-tags"></div>
+                    </div>
+                </div>
+
+                <!-- 4. 当日の予定メッセージ -->
+                <div class="admin-main-card">
+                    <div class="card-header">
+                        <h3>当日の予定メッセージ（お知らせ）</h3>
+                    </div>
+                    <form id="admin-add-message-form" class="admin-inline-form" style="display: flex; flex-direction: column; gap: 0.75rem; align-items: stretch;">
+                        <div class="input-wrapper-mini">
+                            <input type="date" id="adm-msg-date" required>
+                            <span class="date-label">日付</span>
+                        </div>
+                        <textarea id="adm-msg-text" placeholder="当日の予定やメッセージを入力" rows="3" style="width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem; font-family: inherit; resize: vertical;"></textarea>
+                        
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">
+                            <label style="display: block; margin-bottom: 0.25rem;"><i data-lucide="image"></i> 写真添付（任意）</label>
+                            <input type="file" id="adm-msg-photo" accept="image/*" style="font-size: 0.8rem;">
+                        </div>
+                        
+                        <button type="submit" class="mini-primary-btn" style="align-self: flex-start;"><i data-lucide="plus"></i> 追加・更新</button>
+                    </form>
+                    
+                    <div class="table-scroller" style="margin-top: 1.5rem;">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th style="min-width: 60px;">日付</th>
+                                    <th>内容</th>
+                                    <th style="min-width: 50px;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adm-msg-list-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 5. 同期状況 -->
+                <div class="admin-main-card" style="text-align:center; padding:1.5rem;">
+                    <div id="sync-status-icon" style="font-size:2rem; color:var(--primary); margin-bottom:0.5rem;">
+                        <i data-lucide="refresh-cw" class="spin"></i>
+                    </div>
+                    <h3 style="margin-bottom:0.5rem;">クラウド同期 有効</h3>
+                    <p style="font-size:0.75rem; color:var(--text-muted);">
+                        すべてのブラウザとリアルタイムで同期されています。<br>
+                        他人のスマホでの操作も即座に反映されます。
+                    </p>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <!-- Sync Style -->
+    <style>
+        .spin { animation: spin 2s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .badge.syncing { background: var(--success); color: white; }
+    </style>
+
+    <!-- Modal -->
+    <div id="success-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="success-icon"><i data-lucide="check-circle-2"></i></div>
+            <h2>送信完了</h2>
+            <p>お申し込みありがとうございます。</p>
+            <button onclick="document.getElementById('success-modal').classList.add('hidden')"
+                class="primary-btn">閉じる</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
